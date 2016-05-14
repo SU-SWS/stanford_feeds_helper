@@ -70,9 +70,11 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
     }
     if (empty($field_collection_item)) {
       $field_collection_item = entity_create('field_collection_item', array('field_name' => $target));
-      $node = node_load($entity->nid);
-      $field_collection_item->setHostEntity('node', $node);
-      $field_collection_item->save();
+      if (!empty($entity->nid)) {
+        $node = node_load($entity->nid);
+        $field_collection_item->setHostEntity('node', $node);
+        $field_collection_item->save();
+      }
     }
 
     if (isset($_sub_targets[$sub_target]['callback']) && function_exists($_sub_targets[$sub_target]['callback'])) {
