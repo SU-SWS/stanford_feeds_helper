@@ -1,7 +1,8 @@
-#[Stanford Feeds Helper](https://github.com/SU-SWS/stanford_feeds_helper
+#[Stanford Feeds Helper](https://github.com/SU-SWS/stanford_feeds_helper)
 ##### Version: 7.x-1.x
 
 Maintainers: [boznik](https://github.com/boznik), [jbickar](https://github.com/jbickar), [sherakama](https://github.com/sherakama)
+
 [Changelog.txt](CHANGELOG.txt)
 
 The Stanford Feeds Helper module is used to help feeds import field collections into stanford features.
