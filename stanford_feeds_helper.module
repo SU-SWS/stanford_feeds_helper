@@ -70,6 +70,9 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
     }
     if (empty($field_collection_item)) {
       $field_collection_item = entity_create('field_collection_item', array('field_name' => $target));
+      $node = node_load($entity->nid);
+      $field_collection_item->setHostEntity('node', $node);
+      $field_collection_item->save();
     }
 
     if (isset($_sub_targets[$sub_target]['callback']) && function_exists($_sub_targets[$sub_target]['callback'])) {
@@ -79,10 +82,11 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
       $callback = $_sub_targets[$sub_target]['callback'];
       $callback($source, $field_collection_item, $sub_target, $v);
     }
-
-    if (!empty($field_collection_item->item_id)) {
-      $field['und'][$delta]['entity'] = $field_collection_item;
-      $field['und'][$delta]['value'] = $field_collection_item->item_id;
+    
+    switch($target) {
+      case 'field_s_image_info';
+        $field['und'][$delta]['value'] = $field_collection_item->item_id;
+        $field['und'][$delta]['revision_id'] = $field_collection_item->revision_id;
     }
 
     unset($field_collection_item);
@@ -165,3 +169,24 @@ function stanford_feeds_helper_feeds_presave($source, $entity, $item, $entity_id
 
 
 }
+/**
+ * Implements hook_feeds_after_save().
+ * Batch API fails to save image to node, so forcing it programmatically here.
+ */
+function stanford_feeds_helper_feeds_after_save(FeedsSource $source, $entity, $item, $entity_id) {
+  $cid = $entity->field_s_image_info[LANGUAGE_NONE][0]['value'];
+  if(!empty($cid)) {
+    $uri = file_get_contents($item['xpathparser:9']);
+    $parts = explode('/', $item['xpathparser:9']);
+    $img = array_pop($parts);
+    $file = file_save_data($uri, 'public://'.$img, FILE_EXISTS_REPLACE);
+    if (is_object($file)) {
+      $fc = entity_load_single('field_collection_item', array($cid));
+      $fc_wrapper = entity_metadata_wrapper('field_collection_item', $fc);
+      $fc_wrapper->field_s_image_image->file->set($file);
+      $fc_wrapper->save(true);
+    }
+  }
+}
+
+
