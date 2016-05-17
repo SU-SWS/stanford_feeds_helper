@@ -1,6 +1,8 @@
 #[Stanford Feeds Helper](https://github.com/SU-SWS/stanford_feeds_helper)
 ##### Version: 7.x-1.x
 
+TODO: Currently this module has hard coded values to help the stanford_news_extras_feed_importer module. It needs abstracted for use with other modules.
+
 Maintainers: [boznik](https://github.com/boznik), [jbickar](https://github.com/jbickar), [sherakama](https://github.com/sherakama)
 
 [Changelog.txt](CHANGELOG.txt)
