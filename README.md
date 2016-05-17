@@ -3,7 +3,7 @@
 
 TODO: Currently this module has hard coded values to help the stanford_news_extras_feed_importer module. It needs abstracted for use with other modules.
 
-Maintainers: [boznik](https://github.com/boznik), [jbickar](https://github.com/jbickar), [sherakama](https://github.com/sherakama)
+Maintainers: [boznik](https://github.com/boznik)
 
 [Changelog.txt](CHANGELOG.txt)
 
