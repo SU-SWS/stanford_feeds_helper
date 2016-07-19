@@ -8,16 +8,33 @@
  * Implements hook_feeds_processor_targets_alter()
  */
 function stanford_feeds_helper_feeds_processor_targets_alter(&$targets, $entity_type, $bundle_name) {
+  // Load up.
+  $loaded = &drupal_static(__FUNCTION__, FALSE);
+
+  if (!$loaded) {
+    $loaded = TRUE;
+    $path = drupal_get_path('module', 'feeds') . '/mappers';
+    $files = drupal_system_listing('/.*\.inc$/', $path, 'name', 0);
+    foreach ($files as $file) {
+      if (strstr($file->uri, '/mappers/')) {
+        require_once (DRUPAL_ROOT . '/' . $file->uri);
+      }
+    }
+  }
+
   foreach (field_info_instances($entity_type, $bundle_name) as $name => $instance) {
     $info = field_info_field($name);
     if ($info['type'] == 'field_collection') {
-      $new_targets = array();
-      feeds_alter('feeds_processor_targets', $new_targets, 'field_collection_item', $info['field_name']);
+
+      $sub_type = 'field_collection_item';
+      $new_targets = module_invoke_all('feeds_processor_targets', $sub_type, $info['field_name']);
+      drupal_alter('feeds_processor_targets', $new_targets, $sub_type, $info['field_name']);
+
       foreach ($new_targets as $sub_name => $target) {
-        $new_name = $info['field_name'] . ':' . $sub_name;
+        $new_name = t($info['field_name']) . ':' . t($sub_name);
         $targets[$new_name] = $target;
         if (isset($target['name'])) {
-          $targets[$new_name]['name'] = $instance['label'] . ': ' . $target['name'];
+          $targets[$new_name]['name'] = $instance['label'] . ':' . $target['name'];
         }
 
         // We override callback for now and retrieve original later.
@@ -31,74 +48,101 @@ function stanford_feeds_helper_feeds_processor_targets_alter(&$targets, $entity_
  * Process Field Collection items
  */
 function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $value) {
-  static $sub_targets = array();
+  $sub_targets = &drupal_static(__FUNCTION__, array());
 
   $args = explode(':', $target);
   $target = array_shift($args);
   $sub_target = implode(':', $args);
 
-  // Now we retrieve old callbacks and keep then on a static cache
+  $sub_type = 'field_collection_item';
+  $new_targets = module_invoke_all('feeds_processor_targets', $sub_type, $target);
+  drupal_alter('feeds_processor_targets', $new_targets, $sub_type, $target);
+
+  // Now we retrieve old callbacks and keep then on a static cache.
   if (!isset($sub_targets[$target])) {
-    feeds_alter('feeds_processor_targets', $sub_targets[$target], 'field_collection_item', $target);
+    $sub_targets[$target] = array();
+    drupal_alter('feeds_processor_targets', $sub_targets[$target], $sub_type, $target);
   }
 
-  $_sub_targets = $sub_targets[$target];
+  $_sub_targets = $new_targets;
 
   $value = is_array($value) ? $value : array($value);
   $info = field_info_field($target);
 
-  // Sometimes courses have waaaaaaaay too many sections and we might want to
-  // restrict how many are being set because it breaks everything. This is how.
-  //$limit_collections = variable_get("stanford_feeds_helper_limit_field_collections", -1);
-
   // Iterate over all values.
   $delta = 0;
   $field = isset($entity->$target) ? $entity->$target : array();
-  foreach ($value as $v) {
+  try {
+    foreach ($value as $v) {
 
-    //if ($limit_collections !== -1 && $limit_collections > 0) {
-    //  if ($delta >= $limit_collections) {
-    //    break;
-    //  }
-    //}
+      if (empty($v)) {
+        // Avoid creation of empty field collections.
+        continue;
+      }
 
-    if (isset($field['und'][$delta]['entity'])) {
-      $field_collection_item = $field['und'][$delta]['entity'];
-    }
-    elseif (isset($field['und'][$delta]['value'])) {
-      $field_collection_item = field_collection_item_load($field['und'][$delta]['value']);
-    }
-    if (empty($field_collection_item) && isset($entity->nid)) {
-      $field_collection_item = entity_create('field_collection_item', array('field_name' => $target));
-      $node = node_load($entity->nid);
-      $field_collection_item->setHostEntity('node', $node);
-      $field_collection_item->save();
-    }
-    else {
-      $field_collection_item = entity_create('field_collection_item', array('field_name' => $target));
-    }
-    
-    if (isset($_sub_targets[$sub_target]['callback']) && function_exists($_sub_targets[$sub_target]['callback'])) {
+      if (isset($field['und'][$delta]['entity'])) {
+        $field_collection_item = $field['und'][$delta]['entity'];
+      }
+      elseif (isset($field['und'][$delta]['value'])) {
+        $field_collection_item = field_collection_item_load($field['und'][$delta]['value']);
+      }
 
-      stanford_feeds_helper_sub_target_pre_callback_parse($target, $sub_target, $entity, $field, $field_collection_item, $value);
+      if (empty($field_collection_item)) {
+        $field_collection_item = entity_create('field_collection_item', array('field_name' => $target));
+        $field_collection_item->setHostEntity($entity->feeds_item->entity_type, $entity);
+      }
 
-      $callback = $_sub_targets[$sub_target]['callback'];
-      $callback($source, $field_collection_item, $sub_target, $v);
-    }
-    
-    switch($target) {
-      case 'field_s_image_info';
-        $field['und'][$delta]['value'] = $field_collection_item->item_id;
-        $field['und'][$delta]['revision_id'] = $field_collection_item->revision_id;
+      $sub_mapping = array();
+      $config = $source->importer()->getConfig();
+      if (!empty($config['processor']['config']['mappings'])) {
+        foreach ($config['processor']['config']['mappings'] as $mapping) {
+          if ($mapping['target'] == $target . ':' . $sub_target) {
+            $sub_mapping = $mapping;
+            $sub_mapping['target'] = $sub_target;
+            // Needs language or feeds mappers shout php notices.
+            $sub_mapping['language'] = $config['processor']['config']['language'];
+            break;
+          }
+        }
+      }
+
+      if (isset($_sub_targets[$sub_target]['callback']) && function_exists($_sub_targets[$sub_target]['callback'])) {
+        $callback = $_sub_targets[$sub_target]['callback'];
+
+        // We have multiple values use them all.
+        if (!is_array($v)) {
+          $v = array($v);
+        }
+
+        // Check for a limit and force that limit.
+        if ($info["cardinality"] !== "-1") {
+          $v = array_slice($v, 0, $info["cardinality"]);
+        }
+
+        // HiJack the file callback so we can make it work.
+        if ($callback == "file_feeds_set_target") {
+          $callback = "stanford_feeds_helper_field_collection_file_feeds_set_target";
+        }
+
+        $callback($source, $field_collection_item, $sub_target, $v, $sub_mapping);
+      }
+
+      // No need to save the field collection here. Just wait until the node is saved.
+      // If we save the FC here we get a huge performance degregation.
+      $field['und'][$delta]['entity'] = $field_collection_item;
+
+      // Break when only hitting the max delta.
+      if ($info['cardinality'] == $delta) {
         break;
-    }
+      }
 
-    unset($field_collection_item);
-
-    if ($info['cardinality'] == 1) {
-      break;
+      $delta++;
     }
-    $delta++;
+  }
+  catch (Exception $e) {
+    drupal_set_message($e->getMessage(), 'error');
+    watchdog_exception('field_collection', $e, $e->getMessage());
+    throw $e;
   }
 
   $entity->{$target} = $field;
@@ -115,102 +159,84 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
  * @param $value
  */
 function stanford_feeds_helper_sub_target_pre_callback_parse($target, $sub_target, &$entity, &$field, &$field_collection_item, $value) {
-   
+
   // Clear out all previous values as we want a replace and not an additive.
   // TODO: Add similar if block for other field collections.
   if ($target == "field_s_image_info") {
-    switch($sub_target) {
+    switch ($sub_target) {
       case "field_s_image_image	":
       case "field_s_image_credits":
       case "field_s_image_source_info":
       case "field_s_image_caption":
-      $field_collection_item->{$sub_target}[LANGUAGE_NONE] = array();
-      break;
+        $field_collection_item->{$sub_target}[LANGUAGE_NONE] = array();
+        break;
     }
   }
 
 }
 
-
 /**
- * Implements hook_feeds_presave().
+ * Wrapper function for file_feeds_set_target as it doesn't do the nested stuff.
  */
-function stanford_feeds_helper_feeds_presave($source, $entity, $item, $entity_id) {
-  $cid = $entity->field_s_image_info[LANGUAGE_NONE][0]['value'];
-  // Do not save any empty field collection items that may have been created
-  // during the mapping process. Since the mapping is done field by field in
-  // stanford_courses_feeds_set_target(), we have to wait until this hook (when
-  // the field collection item is fully built up) before we can check if it's
-  // empty.
-  $config = $source->importer()->getConfig();
-  if (!empty($config['processor']['config']['mappings'])) {
-    // Find all field collection mappings.
-    foreach ($config['processor']['config']['mappings'] as $mapping) {
-      if (isset($mapping['target'])) {
-        $args = explode(':', $mapping['target']);
-        $field_name = array_shift($args);
-        if (($field = field_info_field($field_name)) && $field['type'] == 'field_collection') {
-          // If the field collection item is empty, do not save it.
-          if (!empty($entity->{$field_name})) {
-            foreach ($entity->{$field_name} as $langcode => &$items) {
-              foreach ($items as $delta => $item) {
-                if (isset($item['entity']) && field_collection_item_is_empty($item['entity'])) {
-                  unset($items[$delta]);
-                }
-              }
-              // Clean up the final array.
-              if (empty($items)) {
-                unset($entity->{$field_name}[$langcode]);
-              }
-              else {
-                $items = array_values($items);
-              }
-            }
-          }
-        }
+function stanford_feeds_helper_field_collection_file_feeds_set_target($source, $entity, $target, $value) {
+
+  if (empty($value)) {
+    return;
+  }
+  module_load_include('inc', 'file');
+
+  // Make sure $value is an array of objects of type FeedsEnclosure.
+  if (!is_array($value)) {
+    $value = array($value);
+  }
+  foreach ($value as $k => $v) {
+    if (!($v instanceof FeedsEnclosure)) {
+      if (is_string($v)) {
+        $value[$k] = new FeedsEnclosure($v, file_get_mimetype($v));
+      }
+      else {
+        unset($value[$k]);
       }
     }
   }
-
-
-}
-/**
- * Implements hook_feeds_after_save().
- * Batch API fails to save image to node, so forcing it programmatically here.
- */
-function stanford_feeds_helper_feeds_after_save(FeedsSource $source, $entity, $item, $entity_id) {
-  $cid = $entity->field_s_image_info[LANGUAGE_NONE][0]['value'];
-  if (empty($cid) && isset($entity->nid)) {
-    $field_collection_item = entity_create('field_collection_item', array('field_name' => 'field_s_image_info'));
-    $node = node_load($entity->nid);
-    $field_collection_item->setHostEntity('node', $node); 
-    $entity = node_load($entity->nid);
-    $node->field_s_image_info[LANGUAGE_NONE][0]['value'] = $field_collection_item->item_id;
-    $node->field_s_image_info[LANGUAGE_NONE][0]['revision_id'] = $field_collection_item->revision_id;
-    if (isset($node->field_s_image_info[LANGUAGE_NONE][1])) {
-      array_shift($node->field_s_image_info[LANGUAGE_NONE]);
-    }
-    $field_collection_item->save();
-    field_attach_update('node', $node);
-    $cid = $node->field_s_image_info[LANGUAGE_NONE][0]['value'];
+  if (empty($value)) {
+    return;
   }
-  if (!empty($cid)) {
-    $uri = file_get_contents($item['xpathparser:9']);
-    $parts = explode('/', $item['xpathparser:9']);
-    $img = array_pop($parts);
-    $file = file_save_data($uri, 'public://'.$img, FILE_EXISTS_REPLACE);
-    if (is_object($file)) {
-      $fc = entity_load_single('field_collection_item', array($cid));
-      $fc->field_s_image_image[LANGUAGE_NONE][0] = (array) $file;
-      $fc_wrapper = entity_metadata_wrapper('field_collection_item', $fc);
-      $fc_wrapper->field_s_image_image->file->set($file);
-      if (isset($fc_wrapper->item_id)) {
-        $fc_wrapper->save(TRUE);
-      } else {
-        $fc_wrapper->save();
+
+  $entity_type = "field_collection_item";
+  $bundle = $entity->field_name;
+
+  // Determine file destination.
+  // @todo This needs review and debugging.
+  $instance_info = field_info_instance($entity_type, $target, $bundle);
+  $info = field_info_field($target);
+  $data = array();
+  if (!empty($entity->uid)) {
+    $data[$entity_type] = $entity;
+  }
+  $destination = file_field_widget_uri($info, $instance_info, $data);
+
+  // Populate entity.
+  $i = 0;
+  $field = isset($entity->$target) ? $entity->$target : array();
+  foreach ($value as $v) {
+    $file = FALSE;
+    try {
+      $v->setAllowedExtensions($instance_info['settings']['file_extensions']);
+      $file = $v->getFile($destination);
+    }
+    catch (Exception $e) {
+      watchdog('feeds', check_plain($e->getMessage()));
+    }
+    if ($file) {
+      $field['und'][$i] = (array)$file;
+      $field['und'][$i]['display'] = 1; // @todo: Figure out how to properly populate this field.
+      if ($info['cardinality'] == 1) {
+        break;
       }
+      $i++;
     }
   }
+  $entity->{$target} = $field;
+
 }
-
-
