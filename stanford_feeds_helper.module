@@ -73,12 +73,11 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
   $delta = 0;
   $field = isset($entity->$target) ? $entity->$target : array();
   try {
-    foreach ($value as $v) {
 
-      if (empty($v)) {
-        // Avoid creation of empty field collections.
-        continue;
-      }
+    while ($value[$delta]) {
+
+      // Zero out.
+      $field_collection_item = null;
 
       if (isset($field['und'][$delta]['entity'])) {
         $field_collection_item = $field['und'][$delta]['entity'];
@@ -109,14 +108,14 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
       if (isset($_sub_targets[$sub_target]['callback']) && function_exists($_sub_targets[$sub_target]['callback'])) {
         $callback = $_sub_targets[$sub_target]['callback'];
 
-        // We have multiple values use them all.
-        if (!is_array($v)) {
-          $v = array($v);
+        // Normalize
+        if (!is_array($value[$delta])) {
+          $value[$delta] = array($value[$delta]);
         }
 
         // Check for a limit and force that limit.
         if ($info["cardinality"] !== "-1") {
-          $v = array_slice($v, 0, $info["cardinality"]);
+          $value[$delta] = array_slice($value[$delta], 0, $info["cardinality"]);
         }
 
         // HiJack the file callback so we can make it work.
@@ -124,7 +123,14 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
           $callback = "stanford_feeds_helper_field_collection_file_feeds_set_target";
         }
 
-        $callback($source, $field_collection_item, $sub_target, $v, $sub_mapping);
+        // Allow altering with many parameters. Cannot use drupal_alter here.
+        $implements = module_implements("sub_target_pre_callback_parse");
+        foreach ($implements as $module_name) {
+          $hook = $module_name . "_" . "sub_target_pre_callback_parse";
+          $hook($target, $sub_target, $entity, $field, $field_collection_item, $value[$delta]);
+        }
+
+        $callback($source, $field_collection_item, $sub_target, $value[$delta], $sub_mapping);
       }
 
       // No need to save the field collection here. Just wait until the node is saved.
@@ -138,6 +144,7 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
 
       $delta++;
     }
+
   }
   catch (Exception $e) {
     drupal_set_message($e->getMessage(), 'error');
