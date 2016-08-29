@@ -71,7 +71,7 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
 
   // Sometimes courses have waaaaaaaay too many sections and we might want to
   // restrict how many are being set because it breaks everyting. This is how.
-  $limit_collections = variable_get("stanford_feeds_importer_limit_field_collections", -1);
+  $limit_collections = variable_get("stanford_feeds_helper_limit_field_collections", -1);
 
   // Iterate over all values.
   $delta = 0;
