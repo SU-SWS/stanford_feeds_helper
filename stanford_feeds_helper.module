@@ -74,7 +74,7 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
   $field = isset($entity->$target) ? $entity->$target : array();
   try {
 
-    while ($value[$delta]) {
+    while (isset($value[$delta])) {
 
       // Zero out.
       $field_collection_item = null;
