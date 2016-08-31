@@ -14,6 +14,12 @@ function stanford_feeds_helper_configure() {
     '#default_value' => variable_get("stanford_feeds_helper_prevent_duplicates", FALSE),
   );
 
+  $form['stanford_feeds_helper_limit_field_collections'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Field collection limit.'),
+    '#description' => t("Set a limit to the number of field collections a single node can have created during import. Set to -1 for unlimited items."),
+    '#default_value' => variable_get("stanford_feeds_helper_limit_field_collections", -1),
+  );
 
   return system_settings_form($form);
 }

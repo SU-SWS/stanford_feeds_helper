@@ -10,8 +10,10 @@
 function stanford_feeds_helper_menu() {
   $items = array();
   $items['admin/config/stanford/stanford_feeds_helper'] = array(
-    'title' => 'Stanford Feeds Helper Configuration',
-    'page callback' => 'stanford_feeds_helper_configure',
+    'title' => 'Stanford Feeds Helper',
+    'description' => t("Configuration settings for feeds."),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('stanford_feeds_helper_configure'),
     'access arguments' => array('administer stanford_feeds_helper'),
     'file' => "stanford_feeds_helper.admin.inc",
   );
