@@ -255,8 +255,9 @@ function stanford_feeds_helper_field_collection_file_feeds_set_target($source, $
 
   // Determine file destination.
   // @todo This needs review and debugging.
-  $instance_info = field_info_instance($entity_type, $target, $bundle);
-  $info = field_info_field($target);
+  list($field_name) = explode(':', $target);
+  $instance_info = field_info_instance($entity_type, $field_name, $bundle);
+  $info = field_info_field($field_name);
   $data = array();
   if (!empty($entity->uid)) {
     $data[$entity_type] = $entity;
@@ -284,7 +285,7 @@ function stanford_feeds_helper_field_collection_file_feeds_set_target($source, $
       $i++;
     }
   }
-  $entity->{$target} = $field;
+  $entity->{$field_name} = $field;
 
 }
 
