@@ -1,0 +1,5 @@
+name = Stanford Feeds Helper Multple
+description = Allow multiple feed sources to attache to a single node type.
+core = 7.x
+package = Stanford
+version = 7.x-1.2-dev
