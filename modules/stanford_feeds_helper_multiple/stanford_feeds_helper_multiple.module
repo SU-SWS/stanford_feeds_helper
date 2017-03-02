@@ -209,7 +209,7 @@ function stanford_feeds_helper_multiple_feeds_get_importer_ids($content_type, $f
  *
  * @see https://www.drupal.org/node/1127696#comment-11819331
  */
-function _stanford_feeds_helper_multiple_feeds_get_importer_weights($importers, $sorted = TRUE) {
+function _stanford_feeds_helper_multiple_feeds_get_importer_weights(array $importers, $sorted = TRUE) {
   foreach (feeds_importer_load_all() as $importer) {
     if (isset($importers[$importer->id])) {
       $importer_weights[$importer->id] = isset($importer->config['weight']) ?
@@ -286,4 +286,3 @@ function stanford_feeds_helper_multiple_feeds_import_form_submit($form, &$form_s
     feeds_source($importer_id, $form['#feed_nid'])->startImport();
   }
 }
-
