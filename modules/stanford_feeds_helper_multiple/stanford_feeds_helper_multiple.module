@@ -27,7 +27,7 @@ function stanford_feeds_helper_multiple_node_prepare($node) {
  * @see https://www.drupal.org/node/1127696#comment-11819331
  */
 function stanford_feeds_helper_multiple_form_alter(&$form, &$form_state, $form_id) {
-  if (strpos($form_id, 'node_form') === FALSE && isset($form['feeds'])) {
+  if (strpos($form_id, 'node_form') === FALSE || !isset($form['feeds'])) {
     return;
   }
   if ($importer_ids = stanford_feeds_helper_multiple_feeds_get_importer_ids($form['#node']->type)) {
