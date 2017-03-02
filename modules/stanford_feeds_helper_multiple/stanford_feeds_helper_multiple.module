@@ -181,6 +181,12 @@ function stanford_feeds_helper_multiple_feeds_get_importer_ids($content_type, $f
   $all_importers = _feeds_importer_digest();
   $importers = array();
   foreach ($all_importers as $importer => $type) {
+    /** @var FeedsImporter $feed_importer */
+    $feed_importer = feeds_importer($importer);
+    if ($feed_importer->disabled) {
+      continue;
+    }
+
     if ($type == $content_type) {
       $importers[$importer] = $importer;
     }
