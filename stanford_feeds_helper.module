@@ -225,9 +225,9 @@ function _stanford_feeds_helper_get_field($entity, $target){
   // deleted from the feed source, we we want to start fresh so that the outcome
   // leaves only 3 entities, not 4. But we only want to reset the field one time
   // for each parent entity.
-  if ($static_id !== $entity_id) {
+  if ("$static_id-$target" !== "$entity_id-$target") {
     $field = array();
-    $static_id = $entity_id;
+    $static_id = "$entity_id-$target";
   }
 
   return $field;
