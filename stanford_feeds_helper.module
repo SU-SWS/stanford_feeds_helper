@@ -204,7 +204,7 @@ function stanford_feeds_helper_feeds_set_target($source, &$entity, $target, $val
  * @return array
  *   Existing data if we're in the middle of editing.
  */
-function _stanford_feeds_helper_get_field($entity, $target){
+function _stanford_feeds_helper_get_field($entity, $target) {
   // Normal behavior for a new entity.
   $field = isset($entity->$target) ? $entity->$target : array();
 
@@ -225,7 +225,7 @@ function _stanford_feeds_helper_get_field($entity, $target){
   // deleted from the feed source, we we want to start fresh so that the outcome
   // leaves only 3 entities, not 4. But we only want to reset the field one time
   // for each parent entity.
-  if ("$static_id-$target" !== "$entity_id-$target") {
+  if ($static_id !== "$entity_id-$target") {
     $field = array();
     $static_id = "$entity_id-$target";
   }
