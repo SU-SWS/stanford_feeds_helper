@@ -1,5 +1,5 @@
 #[Stanford Feeds Helper](https://github.com/SU-SWS/stanford_feeds_helper)
-##### Version: 7.x-1.3
+##### Version: 7.x-1.x-dev
 
 Maintainers: [boznik](https://github.com/boznik)
 
